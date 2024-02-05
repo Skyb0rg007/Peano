@@ -1,0 +1,69 @@
+
+term : type. %name term N.
+0 : term.
+1+ : term -> term.
++ : term -> term -> term. %infix right 10 +.
+* : term -> term -> term. %infix right 10 *.
+
+formula : type. %name formula T.
+%% true : formula.
+false : formula.
+== : term -> term -> formula. %infix right 9 ==.
+=> : formula -> formula -> formula. %infix right 10 =>.
+/\ : formula -> formula -> formula. %infix right 11 /\.
+\/ : formula -> formula -> formula. %infix right 10 \/.
+forall : (term -> formula) -> formula.
+exists : (term -> formula) -> formula.
+
+not : formula -> formula = [f] f => false.
+
+nd : formula -> type. %name nd D.
+%% ⊤
+%% nd/true-intro : nd true.
+%% ⊥
+nd/false-elim : nd false -> nd A.
+%% ⇒
+nd/imp-intro : (nd A -> nd B) -> nd (A => B).
+nd/imp-elim  : nd (A => B) -> nd A -> nd B.
+%% ∧
+nd/and-intro : nd A -> nd B -> nd (A /\ B).
+nd/and-proj1 : nd (A /\ B) -> nd A.
+nd/and-proj2 : nd (A /\ B) -> nd B.
+%% ∨
+nd/or-intro1 : nd A -> nd (A \/ B).
+nd/or-intro2 : nd B -> nd (A \/ B).
+nd/or-elim   : nd (A \/ B) -> (nd A -> nd C) -> (nd B -> nd C) -> nd C.
+%% ∀
+nd/forall-intro : ({n} nd (A n)) -> nd (forall A).
+nd/forall-elim  : nd (forall A) -> {n} nd (A n).
+%% ∃
+nd/exists-intro : {n} nd (A n) -> nd (exists A).
+nd/exists-elim  : nd (exists A) -> ({n} nd (A n) -> nd B) -> nd B.
+%% ≡
+nd/eq-refl : nd (A == A).
+nd/eq-sym : nd (B == A) -> nd (A == B).
+nd/eq-trans : nd (A == B) -> nd (B == C) -> nd (A == C).
+%% Peano Axioms
+nd/zero-succ : nd (0 == 1+ X) -> nd false.
+nd/eq-succ : nd (1+ X == 1+ Y) -> nd (X == Y).
+nd/plus-zero : nd (X + 0 == X).
+nd/plus-succ : nd (X + (1+ Y) == 1+ (X + Y)).
+nd/mult-zero : nd (X * 0 == 0).
+nd/mult-succ : nd (X * (1+ Y) == (X * Y) + X).
+nd/induction : nd ((Phi 0 /\ forall [X] Phi X => Phi (1+ X)) => forall Phi).
+
+%% ¬
+nd/not-intro : (nd A -> nd false) -> nd (not A)
+    = [D] nd/imp-intro D.
+nd/not-elim : nd (not A) -> nd A -> nd false
+    = [D] nd/imp-elim D.
+
+%block nd_hyp : some {A} block {u : nd A}.
+%block nd_param : block {N : term}.
+%worlds (nd_hyp | nd_param) (nd _).
+
+test : nd (exists [n : term] n == n)
+    = nd/exists-intro _ _.
+
+even-odd : nd (forall [N] ((exists [M] M + M == N) \/ (exists [M] 1+ (M + M) == N)))
+    = nd/forall-intro [N] _.
