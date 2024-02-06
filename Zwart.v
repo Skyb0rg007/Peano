@@ -8,14 +8,18 @@ Require Import Coq.Sets.Image.
 (* Require Import Coq.Sets.Integers. *)
 Require Import Lia.
 
-Arguments In {_} _ _ : assert.
+Arguments Add {_} _ _ _ : assert.
+Arguments Empty_set {_} _ : assert.
+Arguments Finite {_} _ : assert.
 Arguments Im {_ _} _ _ _ : assert.
+Arguments In {_} _ _ : assert.
 Arguments Included {_} _ _ : assert.
 Arguments Inhabited {_} _ : assert.
-Arguments Empty_set {_} _ : assert.
-Arguments Singleton {_} _ _ : assert.
-Arguments Union {_} _ _ _ : assert.
 Arguments Intersection {_} _ _ _ : assert.
+Arguments Same_set {_} _ _ : assert.
+Arguments Singleton {_} _ _ : assert.
+Arguments Subtract {_} _ _ _ : assert.
+Arguments Union {_} _ _ _ : assert.
 
 (* Objects: All subsets of the natural numbers
    XXX: Currently implemented using (nat → Prop),
@@ -36,16 +40,105 @@ Definition bounded (s : Ensemble nat) : Prop :=
   exists N, forall n, In s n -> n <= N.
 
 Definition unbounded (s : Ensemble nat) : Prop :=
-  forall N, exists n, In s N /\ n > N.
+  forall N, exists n, In s n /\ n > N.
 
 Definition preimage d c (f : nat -> nat) : Ensemble nat :=
   fun n => In d n /\ In c (f n).
+
+Lemma bounded_not_unbounded (s : Ensemble nat) : bounded s -> ~ unbounded s.
+Proof.
+  intros [N Nbound] UB.
+  destruct (UB N) as [n [sn nN]].
+  pose proof (Nbound n sn).
+  apply Nat.lt_nge in nN.
+  contradiction.
+Qed.
+
+Lemma finite_bounded (s : Ensemble nat) : Finite s -> bounded s.
+Proof.
+  intros fin.
+  induction fin as [|s sfin [N Nbound] n ndisj].
+  - exists O.
+    intros ? H.
+    destruct H.
+  - exists (Nat.max n N).
+    intros m Hm.
+    inversion Hm; subst.
+    + apply Nat.le_trans with (m := N).
+      * apply Nbound; assumption.
+      * apply Nat.le_max_r.
+    + inversion H; subst.
+      apply Nat.le_max_l.
+Qed.
+
+Lemma bounded_decidable_finite (s : Ensemble nat) :
+  (forall n, In s n \/ ~ In s n) -> bounded s -> Finite s.
+Proof.
+  intros dec [N Nbound].
+  generalize dependent s.
+  induction N; intros s dec Nbound.
+  - destruct (dec 0).
+    + replace s with (Singleton 0).
+      apply Singleton_is_finite.
+      apply Extensionality_Ensembles.
+      split.
+      * intros x sx; inversion sx; assumption.
+      * intros x sx; pose proof (Nbound x sx) as H1; inversion H1; constructor.
+    + replace s with (@Empty_set nat).
+      apply Empty_is_finite.
+      apply Extensionality_Ensembles.
+      split.
+      * do 2 intro; contradiction.
+      * intros x sx; pose proof (Nbound x sx) as H1; inversion H1; subst; contradiction.
+  - destruct (dec (S N)).
+    + replace s with (Add (Subtract s (S N)) (S N)).
+      apply Union_is_finite.
+      apply IHN.
+      * intros n; destruct (dec n); [destruct (Nat.eq_dec n (S N))|].
+        right; intros C; inversion C; subst; apply C; constructor.
+        left; split; [assumption|]; intros C; inversion C; subst; contradiction.
+        right; intros C; inversion C; contradiction.
+      * intros n [sn nN].
+        assert (NE : n <> S N) by (intros C; subst; apply nN; constructor).
+        pose proof (Nbound n sn) as LE.
+        inversion LE; subst; [contradiction|assumption].
+      * intros H1; inversion H1; apply H2; constructor.
+      * apply Extensionality_Ensembles; split.
+        -- do 2 intro.
+           inversion H0; subst.
+           inversion H1; assumption.
+           inversion H1; assumption.
+        -- intros x H0.
+           destruct (Nat.eq_dec x (S N)); subst.
+           apply Union_intror; constructor.
+           apply Union_introl.
+           split; [assumption|].
+           intro C; inversion C; subst; contradiction.
+    + apply IHN; [assumption|].
+      intros n sn.
+      destruct (Nat.eq_dec n (S N)).
+      subst; contradiction.
+      pose proof (Nbound n sn).
+      inversion H0; [contradiction|assumption].
+Qed.
 
 (* f : d → c
    For any nonempty bounded subset S ⊆ c, f⁻¹(S) is bounded *)
 Definition inverse_images_bounded' d c (f : nat -> nat) : Prop :=
   forall S, Included S c -> Inhabited S -> bounded S ->
     bounded (preimage d S f).
+
+(* Lemma iib_rewrite d c f : *)
+(*   Included (Im d f) c -> *)
+(*   Inhabited d -> *)
+(*   inverse_images_bounded' d c f -> *)
+(*   forall N, exists M, forall m, In d m -> f m < N -> m < M. *)
+(* Proof. *)
+(*   intros dom [x xd] iib N. *)
+(*   unfold inverse_images_bounded' in iib. *)
+(*   pose proof (dom (f x) (Im_intro nat nat d f x xd (f x) eq_refl)). *)
+(*   pose proof (iib (Im d f) dom (Inhabited_intro nat (Im d f) (f x) (Im_intro _ _ _ _ _ xd _ eq_refl))). *)
+(* Qed. *)
 
 Lemma iib_from d c f : Inhabited d -> inverse_images_bounded' d c f -> inverse_images_bounded d c f.
 Proof.
