@@ -11,6 +11,7 @@ Require Import Lia.
 Arguments In {_} _ _ : assert.
 Arguments Im {_ _} _ _ _ : assert.
 Arguments Included {_} _ _ : assert.
+Arguments Inhabited {_} _ : assert.
 Arguments Empty_set {_} _ : assert.
 Arguments Singleton {_} _ _ : assert.
 Arguments Union {_} _ _ _ : assert.
@@ -30,6 +31,52 @@ Definition obj := Ensemble nat.
  *)
 Definition inverse_images_bounded d c (f : nat -> nat) : Prop :=
   forall N, In c N -> exists M, In d M /\ forall m, In d m -> m > M -> f m > N.
+
+Definition bounded (s : Ensemble nat) : Prop :=
+  exists N, forall n, In s n -> n <= N.
+
+Definition unbounded (s : Ensemble nat) : Prop :=
+  forall N, exists n, In s N /\ n > N.
+
+Definition preimage d c (f : nat -> nat) : Ensemble nat :=
+  fun n => In d n /\ In c (f n).
+
+(* f : d → c
+   For any nonempty bounded subset S ⊆ c, f⁻¹(S) is bounded *)
+Definition inverse_images_bounded' d c (f : nat -> nat) : Prop :=
+  forall S, Included S c -> Inhabited S -> bounded S ->
+    bounded (preimage d S f).
+
+Lemma iib_from d c f : Inhabited d -> inverse_images_bounded' d c f -> inverse_images_bounded d c f.
+Proof.
+  intros [q qd] iib N cN.
+  unfold inverse_images_bounded, inverse_images_bounded' in *.
+  assert (SNc : Included (Singleton N) c).
+  {
+    intros x H; inversion H; subst; assumption.
+  }
+  assert (SNb : bounded (Singleton N)).
+  {
+    exists N.
+    intros n H; inversion H; constructor.
+  }
+Admitted.
+
+Lemma iib_to d c f : inverse_images_bounded d c f -> inverse_images_bounded' d c f.
+Proof.
+  intros iib S Sc [q qS] [N Nbounds].
+  unfold inverse_images_bounded in iib.
+  destruct (iib q (Sc q qS)) as [M [dM Mbounds]].
+  unfold preimage.
+  eexists M.
+  intros n [? ?].
+  destruct (Nat.le_gt_cases n M); try assumption.
+  exfalso.
+  unfold gt in Mbounds.
+  set (Mbounds n H H1).
+  set (Nbounds (f n) H0).
+  set (Nbounds q qS).
+Admitted.
 
 (* Morphisms: A morphism between two objects d,c ∈ P(ℕ) is
  *  an equivalence class of functions f : d → c such that:
@@ -175,6 +222,7 @@ Section Pullbacks.
 
   (* Use Cantor's pairing function to code ℕ × ℕ ≃ ℕ *)
 
+  (* pullback = { (n, m) | n ∈ d1, m ∈ d2, f n = g m } *)
   Inductive pullback : obj :=
     Pullback_intro p n m :
       In d1 n ->
@@ -183,8 +231,10 @@ Section Pullbacks.
       p = Cantor.to_nat (n, m) ->
       In pullback p.
 
+  (* π₁ : pullback → d1 *)
   Definition pi1_fun p := fst (Cantor.of_nat p).
 
+  (* π₁ : pullback → d2 *)
   Definition pi2_fun p := snd (Cantor.of_nat p).
 
   Lemma pi1_dom : Included (Im pullback pi1_fun) d1.
