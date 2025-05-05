@@ -140,19 +140,18 @@ Definition inverse_images_bounded' d c (f : nat -> nat) : Prop :=
 (*   pose proof (iib (Im d f) dom (Inhabited_intro nat (Im d f) (f x) (Im_intro _ _ _ _ _ xd _ eq_refl))). *)
 (* Qed. *)
 
-Lemma iib_from d c f : Inhabited d -> inverse_images_bounded' d c f -> inverse_images_bounded d c f.
+Lemma iib_from d c f : Inhabited d -> Included (Im d f) c -> inverse_images_bounded' d c f -> inverse_images_bounded d c f.
 Proof.
-  intros [q qd] iib N cN.
+  intros _ dom iib N cN.
   unfold inverse_images_bounded, inverse_images_bounded' in *.
-  assert (SNc : Included (Singleton N) c).
-  {
-    intros x H; inversion H; subst; assumption.
-  }
-  assert (SNb : bounded (Singleton N)).
-  {
-    exists N.
-    intros n H; inversion H; constructor.
-  }
+  unfold Included in dom.
+  assert (SNc : Included (Singleton N) c) by
+    (intros x H; inversion H; subst; assumption).
+  assert (SNb : bounded (Singleton N)) by
+    (exists N; intros n H; inversion H; constructor).
+  assert (SNi : Inhabited (Singleton N)) by
+    (exists N; constructor).
+  pose proof (iib (Singleton N) SNc SNi SNb) as [M Mbounds].
 Admitted.
 
 Lemma iib_to d c f : inverse_images_bounded d c f -> inverse_images_bounded' d c f.
@@ -306,7 +305,65 @@ Qed.
  * (the elements of c that are not included in the union of the images
  *  form a bounded set, and the described cofinite requirement holds)
  *)
-(* TODO: Define covering families *)
+Record Cover (c : obj) : Type := {
+  (* A cover consists of a list of k morphisms with codomain c *)
+  cover_morphisms : list { di : obj & mor di c };
+  (* Such that, for M₁, ‥, Mₖ,
+     ∃N, ∀n≥N, ∃1≤i≤k, ∃m∈dᵢ, n∈c → m≥Mᵢ∧fᵢ(m)=n *)
+  cover_bounded (M : list nat) :
+    length M = length cover_morphisms ->
+    exists N, forall n, n >= N -> In c n ->
+    exists i, i < length cover_morphisms /\ exists m,
+      let '(existT _ di f) := List.nth i cover_morphisms (existT (fun di => mor di c) c (id c)) in
+      In di m /\ m >= List.nth i M 0 /\ proj1_sig f m = n;
+}.
+
+Definition isomorphism {d c} (f : mor d c) : Type :=
+  { g : mor c d & mor_equiv (comp f g) (id d) /\ mor_equiv (comp g f) (id c) }.
+
+(* Definition axiom1_domains {d c} (f : mor d c) : Vector.t obj 1 := *)
+(*   Vector.cons _ d _ (Vector.nil _). *)
+
+(* Definition axiom1_morphisms {d c} (f : mor d c) i (H : i < 1) : mor (Vector.nth_order (axiom1_domains f) H) c. *)
+(* Proof. *)
+(*   pose proof (proj1 (Nat.lt_1_r i) H); subst. *)
+(*   unfold Vector.nth_order. *)
+(*   simpl. *)
+(*   exact f. *)
+(* Defined. *)
+
+Lemma axiom1 (d c : Ensemble nat) (f : mor d c) :
+  isomorphism f ->
+  Cover c.
+Proof.
+  intros [g [fgiso gfiso]].
+  apply Build_Cover
+    with (cover_morphisms := List.cons (existT _ d f) List.nil).
+  simpl in *.
+  intros M Elen.
+  destruct f as [ffun [fdom fiib]] eqn:Ef.
+  destruct g as [gfun [gdom giib]] eqn:Eg.
+  unfold mor_equiv, comp, Basics.compose in fgiso, gfiso; simpl in *.
+  destruct fgiso as [Nfg fgiso].
+  destruct gfiso as [Ngf gfiso].
+  exists (Nat.max Nfg Ngf).
+  intros n Nmax.
+  exists 0.
+  split; [apply Nat.lt_0_1|].
+  unfold inverse_images_bounded in fiib, giib.
+  destruct M; inversion Elen; simpl in *; subst.
+  rewrite H0.
+  destruct M; inversion Elen; subst.
+  lt
+  List
+  destruct M.
+  Vector
+  eexists.
+  intros n nN.
+  exists 0, Nat.lt_0_1, n.
+
+  unfold In, axiom1_domains, axiom1_morphisms, Vector.nth_order; simpl.
+Defined.
 
 (* Proposition 4.0.1. All pullbacks exist in P(ℕ). *)
 Section Pullbacks.
@@ -427,6 +484,14 @@ Section Pullbacks.
         rename H1 into fngm'.
       unfold pi1_fun.
       rewrite Cantor.cancel_of_to; simpl.
+      assert (m = m').
+      {
+        admit.
+      }.
+      subst.
+      apply cantor_strict_monotonic_l in xGt.
+      assumption.
+  Admitted.
     (* destruct f as [f' [fdom fiib]] eqn:Ef. *)
     (* destruct g as [g' [gdom giib]] eqn:Eg. *)
     (* unfold inverse_images_bounded in fiib, giib. *)
@@ -448,6 +513,5 @@ Section Pullbacks.
     (* exists M. *)
     (* split. *)
     (* - econstructor. *)
-  Admitted.
 
 End Pullbacks.
